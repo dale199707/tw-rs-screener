@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>強勢股雷達</title>
+<style>
+:root{
+  --bg:#0b0e14;--panel:#121722;--line:#1f2633;--line2:#2a3343;--txt:#e6e9ef;--sub:#8a93a6;--dim:#6b7486;
+  --up:#ff5a5f;--dn:#2ecc71;--gold:#f0a830;--rsbg:#3a2b12;--rs:#ffb547;--tagbg:#173a2a;--tag:#4ade80;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",sans-serif;font-size:14px}
+.wrap{max-width:1500px;margin:0 auto;padding:18px 20px 40px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px 18px;margin-bottom:14px}
+h1{font-size:20px;margin:0;letter-spacing:.5px}
+.meta{color:var(--sub);font-size:13px}
+.meta b{color:var(--txt);font-weight:600}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.chip{border:1px solid var(--line2);background:#161c28;color:var(--txt);border-radius:999px;padding:6px 14px;
+  font-size:14px;cursor:pointer;user-select:none}
+.chip:hover{border-color:#3b475c}
+.chip.on{background:var(--gold);border-color:var(--gold);color:#1a1205;font-weight:700}
+.chip .n{opacity:.7;margin-left:4px;font-size:12px}
+.hint{color:var(--sub);font-size:13px;margin-left:6px}
+.search{margin-left:auto;background:#161c28;border:1px solid var(--line2);color:var(--txt);border-radius:8px;
+  padding:6px 10px;width:170px;font-size:14px}
+.tbl{border:1px solid var(--line);border-radius:10px;background:var(--panel);overflow:auto;max-height:calc(100vh - 150px)}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1280px}
+th,td{padding:0 12px;white-space:nowrap;text-align:right;border-bottom:1px solid var(--line)}
+th{position:sticky;top:0;z-index:2;background:#161b26;color:var(--sub);font-weight:600;font-size:13px;height:40px;
+  cursor:pointer;user-select:none}
+th:hover{color:var(--txt)}
+th.on{color:var(--txt)}
+th .ar{font-size:11px;margin-left:3px}
+td{height:58px;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;z-index:1;background:var(--panel)}
+th:first-child{z-index:3;background:#161b26}
+tr.row{cursor:pointer}
+tr.row:hover td{background:#171e2b}
+tr.both td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+.code{color:var(--dim);font-size:12px;margin-right:6px}
+.nm{font-weight:700;font-size:14.5px}
+.tag{display:block;color:var(--dim);font-size:12px;margin-top:3px}
+.badge{display:inline-block;margin-left:8px;background:var(--tagbg);color:var(--tag);font-size:11.5px;
+  padding:2px 8px;border-radius:999px;font-weight:600;vertical-align:1px}
+.mk{display:inline-block;margin-left:4px;font-size:10.5px;color:var(--dim);border:1px solid var(--line2);
+  border-radius:4px;padding:0 4px}
+.rs{display:inline-block;min-width:30px;text-align:center;padding:3px 6px;border-radius:5px;background:var(--rsbg);
+  color:var(--rs);font-weight:700}
+.up{color:var(--up)} .dn{color:var(--dn)} .gr{color:var(--sub)} .b{font-weight:700}
+.empty{padding:40px;text-align:center;color:var(--sub)}
+.foot{color:var(--dim);font-size:12px;margin-top:12px;line-height:1.7}
+/* 日 K */
+.mask{position:fixed;inset:0;background:rgba(0,0,0,.62);display:none;align-items:center;justify-content:center;z-index:50}
+.mask.on{display:flex}
+.modal{width:min(1100px,96vw);background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:14px 16px}
+.mh{display:flex;align-items:baseline;gap:12px;margin-bottom:8px}
+.mh .t{font-size:17px;font-weight:700}
+.mh .x{margin-left:auto;cursor:pointer;color:var(--sub);font-size:22px;line-height:1}
+.mh .x:hover{color:var(--txt)}
+.legend{color:var(--sub);font-size:12px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin:0 4px 0 10px}
+#chart{height:min(560px,70vh)}
+@media (max-width:700px){.wrap{padding:12px 10px}.search{width:100%;margin-left:0}.hint{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>強勢股雷達</h1>
+    <span class="meta" id="meta">載入中…</span>
+  </header>
+  <div class="bar" id="bar"></div>
+  <div class="tbl"><table><thead><tr id="head"></tr></thead><tbody id="body"></tbody></table></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<div class="mask" id="mask">
+  <div class="modal">
+    <div class="mh"><span class="t" id="kt"></span><span class="legend" id="kl"></span><span class="x" id="kx">×</span></div>
+    <div id="chart"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/lightweight-charts@4.2.3/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+"use strict";
+const COLS = [
+  {k:"c",   h:"股票",            f:stockCell, s:r=>r.c},
+  {k:"cl",  h:"收盤",            f:r=>r.cl==null?"—":r.cl.toFixed(r.cl>=100?1:2)},
+  {k:"rs",  h:"RS",              f:r=>r.rs==null?"—":`<span class="rs">${r.rs}</span>`},
+  {k:"ex",  h:"比指數強",        f:r=>r.ex==null?"—":`<span class="${cls(r.ex)} b">${sg(r.ex,0)}pp</span>`},
+  {k:"ma",  h:"離季線",          f:r=>pct(r.ma)},
+  {k:"yh",  h:"離年高",          f:r=>r.yh==null?"—":`<span class="gr">${fx(r.yh,1)}%</span>`},
+  {k:"fl",  h:"金流",            f:r=>r.fl==null?"—":fx(r.fl,1)+"x"},
+  {k:"inst",h:"法人 20 日（億）", f:instCell, s:r=>Math.max(r.f20||0,0)+Math.max(r.t20||0,0)},
+  {k:"av",  h:"日均（億）",      f:r=>fx(r.av,1)},
+  {k:"v",   h:"當天成交值（億）", f:r=>fx(r.v,1)},
+  {k:"rk",  h:"今日成交值名次",  f:r=>r.rk??"—", asc:true},
+  {k:"fd",  h:"外資當天（億）",  f:r=>money(r.fd)},
+  {k:"td",  h:"投信當天（億）",  f:r=>money(r.td)},
+];
+const FILTERS = [
+  {k:"all",  h:"全部",       f:()=>true},
+  {k:"both", h:"兩種都符合", f:r=>r.a&&r.b},
+  {k:"beat", h:"比大盤強",   f:r=>r.b},
+  {k:"rs",   h:"RS85",       f:r=>r.a},
+];
+const INST_MIN = 1; // 法人 20 日：買超 ≥ 1 億才顯示
+let DATA=null, KL=null, st={filter:"all", sort:"v", dir:-1, q:""};
+try{ const s=JSON.parse(localStorage.getItem("rsr-state")||"null"); if(s) Object.assign(st,s,{q:""}); }catch(e){}
+
+function fx(x,p){ return x==null?"—":Number(x).toFixed(p); }
+function sg(x,p){ return (x>0?"+":x<0?"-":"")+fx(Math.abs(x),p); }
+function cls(x){ return x>0?"up":x<0?"dn":"gr"; }
+function pct(x){ return x==null?"—":`<span>${fx(x,1)}%</span>`; }
+function money(x){ return x==null?"—":`<span class="${cls(x)} b">${x===0?"0.00":sg(x,2)}</span>`; }
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function stockCell(r){
+  const badge = r.a&&r.b ? `<span class="badge">兩種都符合</span>` : "";
+  const mk = r.m==="O" ? `<span class="mk">櫃</span>` : "";
+  return `<span class="code">${r.c}</span><span class="nm">${esc(r.n)}</span>${mk}${badge}<span class="tag">${esc(r.t||"")}</span>`;
+}
+function instCell(r){
+  const p=[];
+  if((r.f20||0)>=INST_MIN) p.push(`外 +${fx(r.f20,0)}`);
+  if((r.t20||0)>=INST_MIN) p.push(`投 +${fx(r.t20,0)}`);
+  return p.length? p.join(' <span class="gr">|</span> ') : '<span class="gr">—</span>';
+}
+
+function rows(){
+  const F=FILTERS.find(x=>x.k===st.filter)||FILTERS[0];
+  const q=st.q.trim();
+  let rs=DATA.rows.filter(F.f).filter(r=>!q||r.c.includes(q)||r.n.includes(q)||(r.t||"").includes(q));
+  const C=COLS.find(c=>c.k===st.sort)||COLS[9];
+  const key=C.s||(r=>r[C.k]);
+  rs.sort((a,b)=>{
+    const x=key(a), y=key(b);
+    if(x==null&&y==null) return 0; if(x==null) return 1; if(y==null) return -1;
+    return (typeof x==="string"? x.localeCompare(y) : x-y)*st.dir;
+  });
+  return rs;
+}
+
+function render(){
+  try{ localStorage.setItem("rsr-state",JSON.stringify({filter:st.filter,sort:st.sort,dir:st.dir})); }catch(e){}
+  const bar=document.getElementById("bar");
+  bar.innerHTML = FILTERS.map(f=>`<span class="chip${st.filter===f.k?" on":""}" data-f="${f.k}">${f.h}<span class="n">${DATA.rows.filter(f.f).length}</span></span>`).join("")
+    + `<span class="hint">點表頭排序｜點股票看日 K｜金線＝兩種都符合</span>`
+    + `<input class="search" id="q" placeholder="搜尋代號／名稱／族群" value="${esc(st.q)}">`;
+  bar.querySelectorAll(".chip").forEach(el=>el.onclick=()=>{st.filter=el.dataset.f;render();});
+  const q=document.getElementById("q");
+  q.oninput=()=>{st.q=q.value;renderBody();};
+
+  document.getElementById("head").innerHTML = COLS.map(c=>{
+    const on=st.sort===c.k;
+    return `<th data-k="${c.k}" class="${on?"on":""}">${c.h}${on?`<span class="ar">${st.dir<0?"↓":"↑"}</span>`:""}</th>`;
+  }).join("");
+  document.querySelectorAll("#head th").forEach(th=>th.onclick=()=>{
+    const k=th.dataset.k, c=COLS.find(x=>x.k===k);
+    if(st.sort===k) st.dir=-st.dir; else { st.sort=k; st.dir=c.asc?1:-1; }
+    render();
+  });
+  renderBody();
+}
+function renderBody(){
+  const rs=rows();
+  document.getElementById("body").innerHTML = rs.length ? rs.map(r=>
+    `<tr class="row${r.a&&r.b?" both":""}" data-c="${r.c}">${COLS.map(c=>`<td>${c.f(r)}</td>`).join("")}</tr>`).join("")
+    : `<tr><td colspan="${COLS.length}" class="empty">沒有符合的股票</td></tr>`;
+  document.querySelectorAll("tr.row").forEach(tr=>tr.onclick=()=>openK(tr.dataset.c));
+}
+
+/* ---------- 日 K ---------- */
+let chart=null;
+async function openK(code){
+  const r=DATA.rows.find(x=>x.c===code);
+  document.getElementById("kt").textContent=`${code} ${r?r.n:""}`;
+  document.getElementById("kl").innerHTML=`<i style="background:#f0a830"></i>MA20<i style="background:#5b9cff"></i>MA60`;
+  document.getElementById("mask").classList.add("on");
+  const box=document.getElementById("chart"); box.innerHTML="";
+  if(typeof LightweightCharts==="undefined"){ box.innerHTML='<div class="empty">圖表元件載入失敗</div>'; return; }
+  if(!KL){ box.innerHTML='<div class="empty">載入日 K…</div>';
+    try{ KL=await (await fetch("data/kline.json?v="+DATA.date)).json(); }catch(e){ box.innerHTML='<div class="empty">日 K 資料載入失敗</div>'; return; }
+    box.innerHTML=""; }
+  const arr=KL.k[code]; if(!arr){ box.innerHTML='<div class="empty">沒有這檔的日 K</div>'; return; }
+  const ds=KL.d.slice(-arr.length).map(d=>`${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6)}`);
+  const candles=[], vols=[];
+  arr.forEach((a,i)=>{ const [o,h,l,c,v]=a; if(c==null) return;
+    candles.push({time:ds[i],open:o??c,high:h??c,low:l??c,close:c});
+    vols.push({time:ds[i],value:v||0,color:(c>=(o??c))?"rgba(255,90,95,.45)":"rgba(46,204,113,.45)"}); });
+  const ma=n=>candles.map((x,i)=>i<n-1?null:{time:x.time,value:candles.slice(i-n+1,i+1).reduce((s,y)=>s+y.close,0)/n}).filter(Boolean);
+  if(chart){ chart.remove(); chart=null; }
+  chart=LightweightCharts.createChart(box,{autoSize:true,
+    layout:{background:{color:"#121722"},textColor:"#8a93a6"},
+    grid:{vertLines:{color:"#1a2130"},horzLines:{color:"#1a2130"}},
+    rightPriceScale:{borderColor:"#2a3343"},timeScale:{borderColor:"#2a3343"},
+    crosshair:{mode:0},localization:{locale:"zh-TW"}});
+  const cs=chart.addCandlestickSeries({upColor:"#ff5a5f",downColor:"#2ecc71",borderUpColor:"#ff5a5f",
+    borderDownColor:"#2ecc71",wickUpColor:"#ff5a5f",wickDownColor:"#2ecc71"});
+  cs.setData(candles);
+  cs.priceScale().applyOptions({scaleMargins:{top:.05,bottom:.25}});
+  chart.addLineSeries({color:"#f0a830",lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(ma(20));
+  chart.addLineSeries({color:"#5b9cff",lineWidth:1,priceLineVisible:false,lastValueVisible:false}).setData(ma(60));
+  const vs=chart.addHistogramSeries({priceFormat:{type:"volume"},priceScaleId:"v",lastValueVisible:false,priceLineVisible:false});
+  vs.priceScale().applyOptions({scaleMargins:{top:.8,bottom:0}});
+  vs.setData(vols);
+  chart.timeScale().setVisibleLogicalRange({from:Math.max(0,candles.length-120),to:candles.length+2});
+}
+function closeK(){ document.getElementById("mask").classList.remove("on"); if(chart){chart.remove();chart=null;} }
+document.getElementById("kx").onclick=closeK;
+document.getElementById("mask").onclick=e=>{ if(e.target.id==="mask") closeK(); };
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeK(); });
+
+/* ---------- 啟動 ---------- */
+(async()=>{
+  try{ DATA=await (await fetch("data/screener.json?t="+Date.now())).json(); }
+  catch(e){ document.getElementById("meta").textContent="資料載入失敗：data/screener.json"; return; }
+  const d=DATA.date, ds=`${d.slice(0,4)}/${d.slice(4,6)}/${d.slice(6)}`;
+  const ix=DATA.idx||[];
+  document.getElementById("meta").innerHTML =
+    `資料日 <b>${ds}</b>　加權 <b>${fx(ix[0],2)}</b>`
+    + (ix[1]!=null?`（近 ${DATA.cfg.EX_DAYS} 日 <span class="${cls(ix[1])}">${sg(ix[1],1)}%</span>）`:"")
+    + `　共 <b>${DATA.rows.length}</b> 檔`
+    + (DATA.inst?"":`　<span class="dn">當日法人尚未公布</span>`);
+  const c=DATA.cfg;
+  document.getElementById("foot").innerHTML =
+    `入榜：收盤站上 ${c.MA_DAYS} 日線、近 ${c.AVG_DAYS} 日均成交值 ≥ ${c.MIN_AVG} 億，且符合「RS ≥ ${c.RS_MIN}」或「比大盤強」其一。<br>`
+    + `RS：近 3/6/9/12 個月還原報酬加權（0.4/0.2/0.2/0.2），全市場 ${DATA.universe} 檔排 1–99。`
+    + `比指數強：近 ${c.EX_DAYS} 日報酬 − 加權指數報酬。`
+    + `比大盤強：比指數強 ≥ +${c.BEAT_PP}pp、RS ≥ ${c.BEAT_RS_MIN}，且 RS 線在近 ${c.BEAT_LINE_DAYS} 日高點 ${c.BEAT_LINE_TOL*100}% 內。<br>`
+    + `金流：近 ${c.AVG_DAYS} 日均成交值 ÷ 再往前 ${c.FLOW_BASE} 日均成交值。法人金額＝買賣超張數 × 當日收盤（估算）。`
+    + `　更新於 ${DATA.built}`;
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+name: daily-update
+
+on:
+  schedule:
+    - cron: "0 10 * * 1-5"   # 台北 18:00（行情 + 三大法人都已公布）
+    - cron: "0 13 * * 1-5"   # 台北 21:00 補抓（法人晚公布時）
+  workflow_dispatch:
+    inputs:
+      backfill_days:
+        description: "首次回補：往回幾個日曆天（0 = 只做每日更新；首次建議 400）"
+        default: "0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      TZ: Asia/Taipei
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests numpy
+
+      - name: git 設定
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: 回補（分段，每 60 天 commit 一次，中斷可重跑接續）
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.backfill_days != '0' }}
+        run: |
+          N=${{ inputs.backfill_days }}
+          for ((from=N; from>0; from-=60)); do
+            to=$(( from>60 ? from-60 : 0 ))
+            S=$(date -d "-${from} days" +%Y%m%d); E=$(date -d "-${to} days" +%Y%m%d)
+            echo "== $S ~ $E"
+            python scripts/fetch_daily.py --start "$S" --end "$E"
+            git add data/
+            git diff --cached --quiet || git commit -m "backfill $S-$E" -q
+            git pull --rebase -X theirs -q && git push -q
+          done
+
+      - name: 每日更新
+        run: python scripts/fetch_daily.py
+
+      - name: 計算指標
+        run: python scripts/build.py
+
+      - name: commit & push
+        run: |
+          git add data/
+          git diff --cached --quiet && exit 0
+          git commit -m "data $(date +%Y%m%d)" -q
+          git pull --rebase -X theirs -q
+          git push -q
